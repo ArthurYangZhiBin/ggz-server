@@ -2,6 +2,7 @@ package store
 
 import (
 	"flag"
+	"fmt"
 	"github.com/dgraph-io/badger"
 )
 
@@ -42,7 +43,7 @@ func View(key string) ([]byte, error) {
 		err = it.Value(func(val []byte) error {
 			value = append([]byte{}, val...)
 			return nil
-		});
+		})
 		return err
 	})
 	return value, err
@@ -54,9 +55,30 @@ func Store(key string, value []byte) error {
 	})
 }
 
-
 func Remove(key string) error {
 	return db.Update(func(txn *badger.Txn) error {
 		return txn.Delete([]byte(key))
 	})
+}
+func Blurry(prefix string) ([]string, error) {
+	var value []string
+	err := db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		prefix := []byte(prefix)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			err := item.Value(func(val []byte) error {
+				fmt.Printf("key=%s, value=%s\n", k, val)
+				value = append(value, string(val))
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return value, err
 }
